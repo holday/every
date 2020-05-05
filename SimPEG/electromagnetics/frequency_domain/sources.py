@@ -139,12 +139,29 @@ class RawVec_e(BaseFDEMSrc):
     :param bool integrate: Integrate the source term (multiply by Me) [False]
     """
 
+    _s_e = properties.Array(
+        "vector defining the electric source term",
+        shape=("*", ),
+        dtype=complex,
+    )
+
     def __init__(self, receiver_list=None, frequency=None, s_e=None, **kwargs):
-        self._s_e = np.array(s_e, dtype=complex)
+        _s_e = kwargs.pop("_s_e", None)
+
+        if _s_e is not None:
+            if s_e is not None:
+                raise Exception(
+                    "Cannot set both `s_e` and `_s_e`"
+                )
+        else:
+            _s_e = s_e
 
         super(RawVec_e, self).__init__(
             receiver_list, frequency=frequency, **kwargs
         )
+
+        if _s_e is not None:
+            self._s_e = np.array(_s_e, dtype=complex)
 
     def s_e(self, simulation):
         """
@@ -169,11 +186,29 @@ class RawVec_m(BaseFDEMSrc):
     :param bool integrate: Integrate the source term (multiply by Me) [False]
     """
 
+    _s_m = properties.Array(
+        "vector defining the electric source term",
+        shape=("*",),
+        dtype=complex,
+    )
+
     def __init__(self, receiver_list=None, frequency=None, s_m=None, **kwargs):
-        self._s_m = np.array(s_m, dtype=complex)
+        _s_m = kwargs.pop("_s_m", None)
+
+        if _s_m is not None:
+            if s_m is not None:
+                raise Exception(
+                    "Cannot set both `s_m` and `_s_m`"
+                )
+        else:
+            _s_m = s_m
+
         super(RawVec_m, self).__init__(
-            receiver_list=receiver_list, frequency=frequency **kwargs
+            receiver_list=receiver_list, frequency=frequency, **kwargs
         )
+
+        if _s_m is not None:
+            self._s_m = np.array(_s_m, dtype=complex)
 
     def s_m(self, simulation):
         """
@@ -188,7 +223,7 @@ class RawVec_m(BaseFDEMSrc):
         return self._s_m
 
 
-class RawVec(BaseFDEMSrc):
+class RawVec(RawVec_e, RawVec_m):
     """
     RawVec source. It is defined by the user provided vectors s_m, s_e
 
@@ -198,38 +233,57 @@ class RawVec(BaseFDEMSrc):
     :param numpy.ndarray s_e: electric source term
     :param bool integrate: Integrate the source term (multiply by Me) [False]
     """
+
+    # _s_e = properties.Array(
+    #     "vector defining the electric source term",
+    #     shape=("*", ),
+    #     dtype=complex,
+    # )
+
+    # _s_m = properties.Array(
+    #     "vector defining the electric source term",
+    #     shape=("*", ),
+    #     dtype=complex,
+    # )
+
     def __init__(
         self, receiver_list=None, frequency=None, s_m=None, s_e=None, **kwargs
     ):
-        self._s_m = np.array(s_m, dtype=complex)
-        self._s_e = np.array(s_e, dtype=complex)
-        super(RawVec, self).__init__(
-            receiver_list=receiver_list, frequency=frequency, **kwargs
+
+        RawVec_e.__init__(
+            self, s_e=s_e, _s_e=kwargs.pop("_s_e", None)
         )
+        RawVec_m.__init__(
+            self, receiver_list=receiver_list, frequency=frequency,
+            s_m=s_m, **kwargs
+        )
+        # super(RawVec, self).__init__(
+        #     receiver_list=receiver_list, frequency=frequency, **kwargs
+        # )
 
-    def s_m(self, simulation):
-        """
-        Magnetic source term
+    # def s_m(self, simulation):
+    #     """
+    #     Magnetic source term
 
-        :param BaseFDEMSimulation simulation: FDEM simulation
-        :rtype: numpy.ndarray
-        :return: magnetic source term on mesh
-        """
-        if simulation._formulation == 'HJ' and self.integrate is True:
-            return simulation.Me * self._s_m
-        return self._s_m
+    #     :param BaseFDEMSimulation simulation: FDEM simulation
+    #     :rtype: numpy.ndarray
+    #     :return: magnetic source term on mesh
+    #     """
+    #     if simulation._formulation == 'HJ' and self.integrate is True:
+    #         return simulation.Me * self._s_m
+    #     return self._s_m
 
-    def s_e(self, simulation):
-        """
-        Electric source term
+    # def s_e(self, simulation):
+    #     """
+    #     Electric source term
 
-        :param BaseFDEMSimulation simulation: FDEM simulation
-        :rtype: numpy.ndarray
-        :return: electric source term on mesh
-        """
-        if simulation._formulation == 'EB' and self.integrate is True:
-            return simulation.Me * self._s_e
-        return self._s_e
+    #     :param BaseFDEMSimulation simulation: FDEM simulation
+    #     :rtype: numpy.ndarray
+    #     :return: electric source term on mesh
+    #     """
+    #     if simulation._formulation == 'EB' and self.integrate is True:
+    #         return simulation.Me * self._s_e
+    #     return self._s_e
 
 
 class MagDipole(BaseFDEMSrc):
@@ -539,6 +593,9 @@ class CircularLoop(MagDipole):
 
 
     def __init__(self, receiver_list=None, frequency=None, location=None, **kwargs):
+
+        radius = kwargs.pop("radius", None)
+
         super(CircularLoop, self).__init__(
             receiver_list, frequency, location, **kwargs
         )

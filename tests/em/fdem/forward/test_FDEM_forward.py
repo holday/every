@@ -33,12 +33,11 @@ class SerializationTest(unittest.TestCase):
     sources_to_test = [
         'CircularLoop',
         'CircularLoopWholeSpace',
-        'LocationVector',
         'MagDipole',
         'MagDipole_Bfield',
         'MagneticDipoleWholeSpace',
-        'PrimSecMappedSigma',
-        'PrimSecSigma',
+        # 'PrimSecMappedSigma',   # these are a bit complicated.
+        # 'PrimSecSigma',
         'RawVec',
         'RawVec_e',
         'RawVec_m'
@@ -62,15 +61,64 @@ class SerializationTest(unittest.TestCase):
                 component=component
             )
             rxs = rx.serialize()
-            rx2 = fdem.receivers.PointCurrentDensity.deserialize(rxs)
+            rx2 = fdem.receivers.BaseRx.deserialize(rxs, trusted=True)
 
             self.assertTrue(rx.storeProjections == rx2.storeProjections)
             self.assertTrue(rx.orientation == rx2.orientation)
             self.assertTrue(rx.component == rx2.component)
             self.assertTrue(np.all(rx.locations == rx2.locations))
+            self.assertTrue(rx.__class__ == rx2.__class__)
 
     def test_source_serialization(self):
-        pass
+        rx = fdem.receivers.PointCurrentDensity(
+            locations=np.atleast_2d([1, 2, 3]),
+            orientation="x",
+            component="real",
+        )
+
+        source_parameters = {
+            "receiver_list" : [rx],
+            "location" : np.r_[0, 0, 0],
+            "frequency" : 1.,
+            "mu" : 2*mu_0,
+            "orientation" : "x",
+            "radius" : 2.,
+            "current" : 3.,
+            "_s_e" : np.random.randn(10),
+            "_s_m" : np.random.randn(20),
+        }
+
+        for s in self.sources_to_test:
+            attrs = {
+                key: val for key, val in source_parameters.items() if key in
+                dir(getattr(fdem.sources, s))
+            }
+
+            src = getattr(fdem.sources, s)(**attrs)
+            src2 = fdem.sources.BaseFDEMSrc.deserialize(src.serialize(), trusted=True)
+
+            for key in attrs.keys():
+                if (
+                    isinstance(source_parameters[key], np.ndarray) or
+                    key == "orientation"
+                ):
+                    self.assertTrue(np.all(
+                        getattr(src, key) == getattr(src2, key)
+                    ))
+                elif key == "receiver_list":
+                    self.assertTrue(
+                        len(src.receiver_list) == len(src2.receiver_list)
+                    )
+
+                    rx0 = src.receiver_list[0]
+                    rx1 = src2.receiver_list[0]
+                    self.assertTrue(rx0.__class__ == rx1.__class__)
+                    self.assertTrue(np.all(rx0.locations == rx1.locations))
+                    self.assertTrue(rx0.orientation == rx1.orientation)
+                else:
+                    self.assertTrue(
+                        getattr(src, key) == getattr(src2, key)
+                    )
 
     def test_survey_serialization(self):
         pass
