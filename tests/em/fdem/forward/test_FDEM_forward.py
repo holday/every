@@ -3,6 +3,9 @@ import numpy as np
 import sys
 from scipy.constants import mu_0
 
+from discretize import TensorMesh
+
+from SimPEG import maps
 from SimPEG.electromagnetics import frequency_domain as fdem
 from SimPEG.electromagnetics import time_domain as tdem
 from SimPEG.electromagnetics.utils.testing_utils import getFDEMProblem, crossCheckTest
@@ -95,7 +98,9 @@ class SerializationTest(unittest.TestCase):
             }
 
             src = getattr(fdem.sources, s)(**attrs)
-            src2 = fdem.sources.BaseFDEMSrc.deserialize(src.serialize(), trusted=True)
+            src2 = fdem.sources.BaseFDEMSrc.deserialize(
+                src.serialize(), trusted=True
+            )
 
             for key in attrs.keys():
                 if (
@@ -121,14 +126,86 @@ class SerializationTest(unittest.TestCase):
                     )
 
     def test_survey_serialization(self):
-        pass
+        rx = fdem.receivers.PointCurrentDensity(
+            locations=np.atleast_2d([1, 2, 3]),
+            orientation="x",
+            component="imag",
+        )
+
+        src = fdem.sources.MagDipole(
+            location=np.r_[0., 3., 0.],
+            orientation="z",
+            receiver_list=[rx]
+        )
+
+        survey = fdem.Survey([src])
+        survey2 = fdem.Survey.deserialize(survey.serialize(), trusted=True)
+
+        self.assertTrue(
+            np.all(survey.source_list[0].location == survey2.source_list[0].location)
+        )
+        self.assertTrue(
+            np.all(survey.source_list[0].orientation == survey2.source_list[0].orientation)
+        )
+        self.assertTrue(
+            np.all(
+                survey.source_list[0].receiver_list[0].locations ==
+                survey2.source_list[0].receiver_list[0].locations
+            )
+        )
+        self.assertTrue(
+            np.all(
+                survey.source_list[0].receiver_list[0].component ==
+                survey2.source_list[0].receiver_list[0].component
+            )
+        )
+
 
     def test_simulation_serialization(self):
-        pass
 
-    def test_fields_serialization(self):
-        pass
+        mesh = TensorMesh([np.ones(10), np.ones(10), np.ones(10)])
+        sigma_map = maps.ExpMap(mesh)
 
+        rx = fdem.receivers.PointCurrentDensity(
+            locations=np.atleast_2d([1, 2, 3]),
+            orientation="x",
+            component="imag",
+        )
+
+        src = fdem.sources.MagDipole(
+            location=np.r_[0., 3., 0.],
+            orientation="z",
+            receiver_list=[rx]
+        )
+
+        survey = fdem.Survey([src])
+
+        for s in [
+            "Simulation3DMagneticField", "Simulation3DElectricField",
+            "Simulation3DCurrentDensity", "Simulation3DMagneticFluxDensity"
+        ]:
+            sim = getattr(fdem, s)(
+                mesh=mesh, sigmaMap=sigma_map, survey=survey
+            )
+
+            sim2 = fdem.simulation.BaseFDEMSimulation.deserialize(
+                sim.serialize(), trusted=True
+            )
+
+            self.assertTrue(
+                np.all(sim.mesh.gridCC == sim2.mesh.gridCC)
+            )
+
+            self.assertTrue(
+                isinstance(sim.sigmaMap, type(sim2.sigmaMap))
+            )
+
+            self.assertTrue(
+                np.all(
+                    sim.survey.source_list[0].location ==
+                    sim2.survey.source_list[0].location
+                )
+            )
 
 class SrcLocTest(unittest.TestCase):
     def test_src(self):
