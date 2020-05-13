@@ -44,8 +44,8 @@ class SerializationTest(unittest.TestCase):
             self.assertTrue(properties.equal(rx, rx2))
 
     def test_source_serialization(self):
-        locationA = np.atleast_2d([0, 0, 0])
-        locationB = np.atleast_2d([1, 1, 1])
+        locationA = np.array([0, 0, 0])
+        locationB = np.array([1, 1, 1])
 
         locationsM = np.atleast_2d([1, 2, 3])
         locationsN = np.atleast_2d([2, 3, 4])
