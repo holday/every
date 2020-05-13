@@ -18,6 +18,7 @@ from SimPEG import data
 
 
 class Survey(BaseSurvey):
+    _REGISTRY = {}
     """
     Base DC survey
     """
