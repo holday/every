@@ -4,19 +4,24 @@ import properties
 from .... import survey
 from ....utils import Zero, closestPoints
 from ....utils.code_utils import deprecate_property
+from .receivers import BaseRx
 
 
 class BaseSrc(survey.BaseSrc):
     """
     Base DC source
     """
+    _REGISTRY = {}
 
     current = properties.Float("amplitude of the source current", default=1.)
 
-    _q = None
+    receiver_list = properties.List(
+        "receiver list",
+        properties.Instance("a SimPEG.electromagnetics.static.resistivity receiver", BaseRx),
+        default=[]
+    )
 
-    def __init__(self, receiver_list, **kwargs):
-        super(BaseSrc, self).__init__(receiver_list, **kwargs)
+    _q = None
 
     def eval(self, prob):
         raise NotImplementedError
@@ -36,11 +41,15 @@ class Dipole(BaseSrc):
     )
     loc = deprecate_property(location, 'loc', removal_version='0.15.0')
 
-    def __init__(self, receiver_list, locationA, locationB, **kwargs):
-        if locationA.shape != locationB.shape:
-            raise Exception('Shape of locationA and locationB should be the same')
-        super(Dipole, self).__init__(receiver_list, **kwargs)
-        self.location = [locationA, locationB]
+    def __init__(self, receiver_list=None, locationA=None, locationB=None, **kwargs):
+        loc = kwargs.pop('location', None)
+        if loc is None:
+            if locationA.shape != locationB.shape:
+                raise Exception('Shape of locationA and locationB should be the same')
+            self.location = [locationA, locationB]
+        else:
+            self.location = loc
+        super().__init__(receiver_list=receiver_list, **kwargs)
 
     def eval(self, prob):
         if self._q is not None:
@@ -62,9 +71,6 @@ class Dipole(BaseSrc):
 
 
 class Pole(BaseSrc):
-
-    def __init__(self, receiver_list, location, **kwargs):
-        super(Pole, self).__init__(receiver_list, location=location, **kwargs)
 
     def eval(self, prob):
         if self._q is not None:

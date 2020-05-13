@@ -10,8 +10,8 @@ from ..resistivity.fields import FieldsDC, Fields3DCellCentered, Fields3DNodal
 from ..resistivity import Simulation3DCellCentered as BaseSimulation3DCellCentered
 from ..resistivity import Simulation3DNodal as BaseSimulation3DNodal
 
-
 class BaseIPSimulation(BaseEMSimulation):
+    _REGISTRY = {}
 
     sigma = props.PhysicalProperty(
         "Electrical conductivity (S/m)"
@@ -26,17 +26,24 @@ class BaseIPSimulation(BaseEMSimulation):
     eta, etaMap, etaDeriv = props.Invertible(
         "Electrical Chargeability"
     )
+    _Jmatrix = None
+    _f = None
+    sign = None
+    _pred = None
+
+    @property
+    def deleteTheseOnModelUpdate(self):
+        toDelete = []
+        return toDelete
+
+class BaseIPSimulation3D(BaseIPSimulation):
 
     # surveyPair = Survey
     fieldsPair = FieldsDC
     Ainv = None
-    _f = None
     storeJ = False
-    _Jmatrix = None
     gtgdiag = None
-    sign = None
     data_type = 'volt'
-    _pred = None
     gtgdiag = None
 
 
@@ -264,11 +271,6 @@ class BaseIPSimulation(BaseEMSimulation):
         del self._Jmatrix, self._MfRhoI, self._MeSigma
 
     @property
-    def deleteTheseOnModelUpdate(self):
-        toDelete = []
-        return toDelete
-
-    @property
     def MfRhoDerivMat(self):
         """
         Derivative of MfRho with respect to the model
@@ -338,28 +340,23 @@ class BaseIPSimulation(BaseEMSimulation):
                 )
 
 
-class Simulation3DCellCentered(BaseIPSimulation, BaseSimulation3DCellCentered):
+class Simulation3DCellCentered(BaseIPSimulation3D, BaseSimulation3DCellCentered):
 
     _solutionType = 'phiSolution'
     _formulation = 'HJ'  # CC potentials means J is on faces
     fieldsPair = Fields3DCellCentered
     sign = 1.
-    bc_type = 'Dirichlet'
-
-    def __init__(self, mesh, **kwargs):
-        super(Simulation3DCellCentered, self).__init__(mesh, **kwargs)
-        self.setBC()
+    # def __init__(self, mesh=None, **kwargs):
+    #     super().__init__(mesh=None, **kwargs)
+    #     self.setBC()
 
 
-class Simulation3DNodal(BaseIPSimulation, BaseSimulation3DNodal):
+class Simulation3DNodal(BaseIPSimulation3D, BaseSimulation3DNodal):
 
     _solutionType = 'phiSolution'
     _formulation = 'EB'  # N potentials means B is on faces
     fieldsPair = Fields3DNodal
     sign = -1.
-
-    def __init__(self, mesh, **kwargs):
-        super(Simulation3DNodal, self).__init__(mesh, **kwargs)
 
 
 ############

@@ -27,6 +27,7 @@ from .utils import (
 
 
 class IdentityMap(properties.HasProperties):
+    _REGISTRY = {}
     """
         SimPEG Map
     """

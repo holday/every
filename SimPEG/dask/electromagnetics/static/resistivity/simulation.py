@@ -1,4 +1,4 @@
-from .....electromagnetics.static.resistivity.simulation import BaseDCSimulation as Sim
+from .....electromagnetics.static.resistivity.simulation import BaseDCSimulation3D as Sim
 from .....utils import Zero
 
 from ....utils import compute_chunk_sizes

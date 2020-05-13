@@ -14,6 +14,7 @@ from ...survey import BaseRx
 
 
 class BaseRxNSEM_Point(BaseRx):
+    _REGISTRY = {}
     """
     Natural source receiver base class.
 

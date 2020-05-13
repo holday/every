@@ -19,6 +19,7 @@ def IntTrapezoidal(kys, Pf, y=0.0):
 
 # Receiver classes
 class BaseRx(BaseSimPEGRx):
+    _REGISTRY = {}
     """
     Base DC receiver
     """
@@ -101,22 +102,23 @@ class Dipole(BaseRx):
     Dipole receiver
     """
 
-    # Threshold to be assumed as a pole receiver
-    threshold = 1e-5
-
     locations = properties.List(
         "list of locations of each electrode in a dipole receiver",
         RxLocationArray("location of electrode", shape=("*", "*")),
         min_length=1, max_length=2
     )
 
-    def __init__(self, locationsM, locationsN, **kwargs):
-        if locationsM.shape != locationsN.shape:
-            raise ValueError(
-                'locationsM and locationsN need to be the same size')
-        locations = [np.atleast_2d(locationsM), np.atleast_2d(locationsN)]
+    def __init__(self, locationsM=None, locationsN=None, **kwargs):
+        locs = kwargs.pop('locations', None)
+        if locs is None:
+            if locationsM.shape != locationsN.shape:
+                raise ValueError(
+                    'locationsM and locationsN need to be the same size')
+            locations = [np.atleast_2d(locationsM), np.atleast_2d(locationsN)]
+            self.locations = locations
+        else:
+            self.locations = locs
         super(Dipole, self).__init__(**kwargs)
-        self.locations = locations
 
     @property
     def nD(self):
@@ -140,7 +142,7 @@ class Dipole(BaseRx):
             self._Ps[mesh] = P
 
         if transpose:
-            P = P.toarray().T
+            P = P.T
 
         return P
 

@@ -12,21 +12,13 @@ from .receivers import IntTrapezoidal
 from .fields_2d import Fields2D, Fields2DCellCentered, Fields2DNodal
 from .fields import FieldsDC, Fields3DCellCentered, Fields3DNodal
 from .boundary_utils import getxBCyBC_CC
-from .utils import _mini_pole_pole
+from .simulation import BaseDCSimulation
 
 
-class BaseDCSimulation2D(BaseEMSimulation):
+class BaseDCSimulation2D(BaseDCSimulation):
     """
-    Base 2.5D DC problem
+    Base 2.5D DC simulation
     """
-
-    survey = properties.Instance(
-        "a DC survey object", Survey, required=True
-    )
-
-    storeJ = properties.Bool(
-        "store the sensitivity matrix?", default=False
-    )
 
     fieldsPair = Fields2D  # SimPEG.EM.Static.Fields_2D
     fieldsPair_fwd = FieldsDC
@@ -35,17 +27,6 @@ class BaseDCSimulation2D(BaseEMSimulation):
     Ainv = [None for i in range(nky)]
     nT = nky-1  # Only for using TimeFields
     # there's actually nT+1 fields, so we don't need to store the last one
-    _Jmatrix = None
-    fix_Jmatrix = False
-    _mini_survey = None
-
-    def __init__(self, *args, **kwargs):
-        miniaturize = kwargs.pop('miniaturize', False)
-        super().__init__(*args, **kwargs)
-        # Do stuff to simplify the forward and JTvec operation if number of dipole
-        # sources is greater than the number of unique pole sources
-        if miniaturize:
-            self._dipoles, self._invs, self._mini_survey = _mini_pole_pole(self.survey)
 
     def set_geometric_factor(self, geometric_factor):
         index = 0
@@ -114,21 +95,6 @@ class BaseDCSimulation2D(BaseEMSimulation):
 
         return self._mini_survey_data(temp)
 
-    def getJ(self, m, f=None):
-        """
-            Generate Full sensitivity matrix
-        """
-        if self._Jmatrix is not None:
-            return self._Jmatrix
-        else:
-            if self.verbose:
-                print("Calculating J and storing")
-            self.model = m
-            if f is None:
-                f = self.fields(m)
-            self._Jmatrix = (self._Jtvec(m, v=None, f=f)).T
-        return self._Jmatrix
-
     def Jvec(self, m, v, f=None):
         """
             Compute sensitivity matrix (J) and vector (v) product.
@@ -179,21 +145,6 @@ class BaseDCSimulation2D(BaseEMSimulation):
 
         return self._mini_survey_data(Jv)
 
-    def Jtvec(self, m, v, f=None):
-        """
-            Compute adjoint sensitivity matrix (J^T) and vector (v) product.
-        """
-        if self.storeJ:
-            J = self.getJ(m, f=f)
-            Jtv = mkvc(np.dot(J.T, v))
-            return Jtv
-
-        self.model = m
-
-        if f is None:
-            f = self.fields(m)
-
-        return self._Jtvec(m, v=v, f=f)
 
     def _Jtvec(self, m, v=None, f=None):
         """
@@ -309,18 +260,12 @@ class BaseDCSimulation2D(BaseEMSimulation):
 
     @property
     def deleteTheseOnModelUpdate(self):
-        toDelete = super(BaseDCSimulation2D, self).deleteTheseOnModelUpdate
+        toDelete = super().deleteTheseOnModelUpdate
         if self.sigmaMap is not None:
             toDelete += [
                 '_MnSigma', '_MnSigmaDerivMat',
                 '_MccRhoi', '_MccRhoiDerivMat'
             ]
-
-        if self.fix_Jmatrix:
-            return toDelete
-
-        if self._Jmatrix is not None:
-            toDelete += ['_Jmatrix']
         return toDelete
 
     def _mini_survey_data(self, d_mini):

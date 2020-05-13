@@ -16,8 +16,9 @@ except ImportError:
 from empymod.utils import check_hankel
 from ..utils import static_utils
 
+from .simulation import BaseDCSimulation
 
-class Simulation1DLayers(BaseEMSimulation):
+class Simulation1DLayers(BaseDCSimulation):
     """
     1D DC Simulation
     """
@@ -25,25 +26,21 @@ class Simulation1DLayers(BaseEMSimulation):
         "thicknesses of the layers"
     )
 
-    survey = properties.Instance(
-        "a DC survey object", Survey, required=True
+    data_type = properties.StringChoice(
+        "data type to predict. Must be 'volt', 'apparent_resistivity', 'apparent_conductivity'",
+        ["volt", "apparent_resistivity", "apparent_conductivity"],
+        default="volt"
     )
 
-    storeJ = properties.Bool(
-        "store the sensitivity", default=False
-    )
-
-    data_type = 'volt'
     hankel_pts_per_dec = None       # Default: Standard DLF
 
     # TODO: using 51 filter coefficient could be overkill, use less if possible
     hankel_filter = 'key_51_2012'  # Default: Hankel filter
 
-    _Jmatrix = None
     fix_Jmatrix = False
 
     def __init__(self, **kwargs):
-        BaseEMSimulation.__init__(self, **kwargs)
+        super().__init__(**kwargs)
         try:
             ht, htarg = check_hankel('fht', [self.hankel_filter, self.hankel_pts_per_dec], 1)
             self.fhtfilt = htarg[0]             # Store filter
@@ -93,8 +90,10 @@ class Simulation1DLayers(BaseEMSimulation):
         V = voltage.reshape((self.survey.nD, 4), order='F')
         data = V[:, 0]+V[:, 1] - (V[:, 2]+V[:, 3])
 
-        if self.data_type == 'apparent_resistivity':
+        if self.data_type != 'volt':
             data /= self.geometric_factor
+        if self.data_type == 'apparent_conductivity':
+            data = 1/data
 
         return data
 
@@ -162,16 +161,6 @@ class Simulation1DLayers(BaseEMSimulation):
         Jtv = mkvc(np.dot(J.T, v))
 
         return Jtv
-
-    @property
-    def deleteTheseOnModelUpdate(self):
-        toDelete = super(Simulation1DLayers, self).deleteTheseOnModelUpdate
-        if self.fix_Jmatrix:
-            return toDelete
-
-        if self._Jmatrix is not None:
-            toDelete += ['_Jmatrix']
-        return toDelete
 
     @property
     def electrode_separations(self):

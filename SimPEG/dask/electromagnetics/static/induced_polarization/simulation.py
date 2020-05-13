@@ -1,4 +1,4 @@
-from .....electromagnetics.static.induced_polarization.simulation import BaseIPSimulation as Sim
+from .....electromagnetics.static.induced_polarization.simulation import BaseIPSimulation3D as Sim
 
 from ....utils import compute_chunk_sizes
 import dask

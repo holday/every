@@ -19,6 +19,7 @@ from .survey import Survey
 
 
 class BaseSIPSimulation(BaseEMSimulation):
+    _REGISTRY = {}
 
     sigma = props.PhysicalProperty(
         "Electrical conductivity (S/m)"

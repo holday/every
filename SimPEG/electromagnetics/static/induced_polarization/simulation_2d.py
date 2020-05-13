@@ -8,33 +8,15 @@ from ....utils import sdiag
 from ..resistivity.fields_2d import (
     Fields2D, Fields2DCellCentered, Fields2DNodal
 )
-
+from .simulation import BaseIPSimulation
 from ..resistivity.simulation_2d import BaseDCSimulation2D
 from ..resistivity import Simulation2DCellCentered as BaseSimulation2DCellCentered
 from ..resistivity import Simulation2DNodal as BaseSimulation2DNodal
 
 
-class BaseIPSimulation2D(BaseDCSimulation2D):
-
-    sigma = props.PhysicalProperty(
-        "Electrical conductivity (S/m)"
-    )
-
-    rho = props.PhysicalProperty(
-        "Electrical resistivity (Ohm m)"
-    )
-
-    props.Reciprocal(sigma, rho)
-
-    eta, etaMap, etaDeriv = props.Invertible(
-        "Electrical Chargeability (V/V)"
-    )
+class BaseIPSimulation2D(BaseIPSimulation, BaseDCSimulation2D):
 
     fieldsPair = Fields2D
-    _Jmatrix = None
-    _f = None
-    sign = None
-    _pred = None
 
     def set_dc_data(
         self, dc_voltage, data_type='apparent_chargeability', dc_survey=None
@@ -94,11 +76,6 @@ class BaseIPSimulation2D(BaseDCSimulation2D):
         J = self.getJ(m, f=f)
         Jtv = J.T.dot(v)
         return self.sign * Jtv
-
-    @property
-    def deleteTheseOnModelUpdate(self):
-        toDelete = []
-        return toDelete
 
     @property
     def MeSigmaDerivMat(self):

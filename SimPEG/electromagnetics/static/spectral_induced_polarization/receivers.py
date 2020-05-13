@@ -6,7 +6,7 @@ from ....survey import BaseTimeRx, RxLocationArray
 
 
 class BaseRx(BaseTimeRx):
-
+    _REGISTRY = {}
     orientation = properties.StringChoice(
         "orientation of the receiver. Must currently be 'x', 'y', 'z'",
         ["x", "y", "z"]

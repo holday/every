@@ -11,8 +11,8 @@ from .survey import Survey
 from .fields import Fields3DCellCentered, Fields3DNodal
 from .utils import _mini_pole_pole
 
-
 class BaseDCSimulation(BaseEMSimulation):
+    _REGISTRY = {}
     """
     Base DC Problem
     """
@@ -25,19 +25,68 @@ class BaseDCSimulation(BaseEMSimulation):
         "store the sensitivity matrix?", default=False
     )
 
-    _mini_survey = None
+    miniaturize = properties.Bool(
+        "attempt to miniaturize the survey into pole-pole receivers internally",
+        default=False
+    )
 
-    Ainv = None
+    _mini_survey = None
     _Jmatrix = None
     gtgdiag = None
 
+    fix_Jmatrix = properties.Bool(
+        "Whether to fix the Jmatrix throughout the inversion",
+        default=False
+    )
+
     def __init__(self, *args, **kwargs):
-        miniaturize = kwargs.pop('miniaturize', False)
         super().__init__(*args, **kwargs)
         # Do stuff to simplify the forward and JTvec operation if number of dipole
         # sources is greater than the number of unique pole sources
-        if miniaturize:
+        if self.miniaturize:
             self._dipoles, self._invs, self._mini_survey = _mini_pole_pole(self.survey)
+
+    def getJ(self, m, f=None):
+        if self._Jmatrix is None:
+            if self.verbose:
+                print("Calculating J and storing")
+            self.model = m
+            if f is None:
+                f = self.fields(m)
+            self._Jmatrix = (self._Jtvec(m, v=None, f=f)).T
+        return self._Jmatrix
+
+    def Jtvec(self, m, v, f=None):
+        """
+            Compute adjoint sensitivity matrix (J^T) and vector (v) product.
+        """
+
+        if f is None:
+            f = self.fields(m)
+
+        self.model = m
+
+        if self.storeJ:
+            J = self.getJ(m, f=f)
+            return np.asarray(J.T.dot(v))
+
+        return self._Jtvec(m, v=v, f=f)
+
+    @property
+    def deleteTheseOnModelUpdate(self):
+        toDelete = super().deleteTheseOnModelUpdate
+        if self.fix_Jmatrix:
+            return toDelete
+        if self._Jmatrix is not None:
+            toDelete += ['_Jmatrix']
+        return toDelete
+
+class BaseDCSimulation3D(BaseDCSimulation):
+    """
+    Base 3D DC simulation
+    """
+
+    Ainv = None
 
     def fields(self, m=None, calcJ=True):
         if m is not None:
@@ -54,13 +103,6 @@ class BaseDCSimulation(BaseEMSimulation):
         f[:, self._solutionType] = self.Ainv * RHS
 
         return f
-
-    def getJ(self, m, f=None):
-        if self._Jmatrix is None:
-            if f is None:
-                f = self.fields(m)
-            self._Jmatrix = self._Jtvec(m, v=None, f=f).T
-        return self._Jmatrix
 
     def dpred(self, m=None, f=None):
         if self._mini_survey is not None:
@@ -126,22 +168,6 @@ class BaseDCSimulation(BaseEMSimulation):
                 Jv.append(rx.evalDeriv(source, self.mesh, f, df_dm_v))
         Jv = np.hstack(Jv)
         return self._mini_survey_data(Jv)
-
-    def Jtvec(self, m, v, f=None):
-        """
-            Compute adjoint sensitivity matrix (J^T) and vector (v) product.
-        """
-
-        if f is None:
-            f = self.fields(m)
-
-        self.model = m
-
-        if self.storeJ:
-            J = self.getJ(m, f=f)
-            return np.asarray(J.T.dot(v))
-
-        return self._Jtvec(m, v=v, f=f)
 
     def _Jtvec(self, m, v=None, f=None):
         """
@@ -228,9 +254,7 @@ class BaseDCSimulation(BaseEMSimulation):
 
     @property
     def deleteTheseOnModelUpdate(self):
-        toDelete = super(BaseDCSimulation, self).deleteTheseOnModelUpdate
-        if self._Jmatrix is not None:
-            toDelete += ['_Jmatrix']
+        toDelete = super().deleteTheseOnModelUpdate
         if self.gtgdiag is not None:
             toDelete += ['gtgdiag']
         return toDelete
@@ -259,8 +283,7 @@ class BaseDCSimulation(BaseEMSimulation):
             out = v
         return out
 
-
-class Simulation3DCellCentered(BaseDCSimulation):
+class Simulation3DCellCentered(BaseDCSimulation3D):
     """
     3D cell centered DC problem
     """
@@ -268,11 +291,14 @@ class Simulation3DCellCentered(BaseDCSimulation):
     _solutionType = 'phiSolution'
     _formulation = 'HJ'  # CC potentials means J is on faces
     fieldsPair = Fields3DCellCentered
-    bc_type = 'Dirichlet'
+    bc_type = properties.StringChoice(
+        "data type to predict. Must be 'volt', 'apparent_resistivity', 'apparent_conductivity'",
+        ["Dirichlet", "Neumann", "Mixed"],
+        default="Dirichlet"
+    )
 
-    def __init__(self, mesh, **kwargs):
-
-        BaseDCSimulation.__init__(self, mesh, **kwargs)
+    def __init__(self, mesh=None, **kwargs):
+        super().__init__(mesh=mesh, **kwargs)
         self.setBC()
 
     def getA(self):
@@ -468,7 +494,7 @@ class Simulation3DCellCentered(BaseDCSimulation):
             self.Grad = self.Div.T - P_BC*sdiag(y_BC)*M
 
 
-class Simulation3DNodal(BaseDCSimulation):
+class Simulation3DNodal(BaseDCSimulation3D):
     """
     3D nodal DC problem
     """
@@ -477,8 +503,8 @@ class Simulation3DNodal(BaseDCSimulation):
     _formulation = 'EB'  # N potentials means B is on faces
     fieldsPair = Fields3DNodal
 
-    def __init__(self, mesh, **kwargs):
-        BaseDCSimulation.__init__(self, mesh, **kwargs)
+    def __init__(self, mesh=None, **kwargs):
+        super().__init__(mesh=mesh, **kwargs)
         # Not sure why I need to do this
         # To evaluate mesh.aveE2CC, this is required....
         if mesh._meshType == "TREE":
